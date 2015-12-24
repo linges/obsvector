@@ -1,0 +1,15 @@
+{application, obsvector,
+ [
+  {description, ""},
+  {vsn, "1"},
+  {registered, []},
+  {applications, [
+                  kernel,
+                  stdlib,
+                  sync,
+                  cowboy
+                 ]},
+  {mod, { obsvector_app, []}},
+  {env, [{http_port, 8080}]}
+ ]}.
+
