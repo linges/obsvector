@@ -23,7 +23,7 @@ stop(_State) ->
 routes() ->
     [
      {'_', [
-           {"/", cowboy_static, {file, "priv/static/index.html"}},
+           {"/", cowboy_static, {priv_file, obsvector, "static/index.html"}},
            {"/json/obs.json", obsvector_handler, []}
            ]}
     ].

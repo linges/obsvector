@@ -9,7 +9,7 @@ elm:
 	elm-make elm/Main.elm --output=priv/static/index.html
 
 run:
-	erl -pa ebin deps/*/ebin -s obsvector
+	erl -sname obsvector -pa ../obsvector/ebin ../obsvector/deps/*/ebin ../obsvector -s obsvector
 
 deps:
 	rebar get-deps &&\

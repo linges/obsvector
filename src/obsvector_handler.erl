@@ -6,6 +6,8 @@
 
 init(_Transport, Req, []) ->
         {ok, Req, undefined}.
+%%TODOS:
+%% -make it a hidden node?
 
 handle(Req, State) ->
     {P, Req2} = cowboy_req:qs_val(<<"pid">>, Req, undefined),

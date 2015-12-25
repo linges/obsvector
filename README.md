@@ -3,7 +3,7 @@ A small tool to observe erlang processes and inspect their state.
 
 ## Build and run
 `make && make run`
-Then oben localhost:8080
+Then open localhost:8080
 
 ## Dependencies
 * Erlang 17.0 or higher
