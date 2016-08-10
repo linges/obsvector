@@ -1,24 +1,25 @@
-module ProcessList(init, update, view, Model) where
+module ProcessList exposing (init, update, view, Model, getProcessList)
 
 import Html exposing (..)
 import Html.Shorthand exposing (..)
 import Html.Attributes exposing (style, class, type', value, id)
-import Html.Events exposing (onClick, onKeyPress, on, targetValue)
-import Process
+import Html.Events exposing (onClick, onInput)
+import ErlangProcess as EP
 import List exposing (map, filter)
 import Json.Decode exposing (list, string, succeed)
 import Task exposing (Task)
 import Http exposing (get)
-import Effects exposing (Effects)
 import ProcessState as State
 import String
+import Html.App
+import Debug
 
 -- MODEL
 
 type alias Model = { processList : ProcessList
                    , filter : String
                    , error : String
-                   , selected : Maybe Process.Pid
+                   , selected : Maybe EP.Pid
                    , state : Maybe State.Model
                    }
 
@@ -34,35 +35,35 @@ init current =
   )
 
 -- UPDATE
-type alias ProcessList = List Process.Model
+type alias ProcessList = List EP.Model
 
-type Action = Refetch
-            | ReceiveProcessList ProcessList
-            | Filter String
-            | Error String
-            | Selected Process.Pid
-            | StateAction Process.Pid State.Action
+type Msg = Refetch
+         | ReceiveProcessList ProcessList
+         | Filter String
+         | Error String
+         | Selected EP.Pid
+         | StateMsg EP.Pid State.Msg
 
-update : Action -> Model -> (Model, Effects Action)
+update : Msg -> Model -> (Model, Cmd Msg)
 update action model =
 
-  case action of
+  case (Debug.log "ac" action) of
     Refetch ->
       (model, getProcessList)
 
     ReceiveProcessList processList ->
       ( {model | processList = processList}
-      , Effects.none
+      , Cmd.none
       )
 
     Filter f ->
       ( {model | filter = f}
-      , Effects.none
+      , Cmd.none
       )
 
     Error s ->
       ( {model | error = s}
-      , Effects.none
+      , Cmd.none
       )
 
     Selected p ->
@@ -70,70 +71,71 @@ update action model =
       in
       ( {model | selected = Just p
                , state = Just state}
-      , Effects.map (StateAction p) eff
+      , Cmd.map (StateMsg p) eff
       )
 
-    StateAction pid action ->
+    StateMsg pid action ->
       case model.state of
         Nothing ->
           ( model
-          , Effects.none)
+          , Cmd.none)
         Just state ->
           if state.pid == pid then
             let (state, eff) = (State.update action) state
             in
               ( {model | state = Just state}
-              , Effects.map (StateAction state.pid) eff
+              , Cmd.map (StateMsg state.pid) eff
               )
           else
             ( model
-            , Effects.none)
+            , Cmd.none)
 
 -- VIEW
 
-view : Signal.Address Action -> Model -> Html
-view address model =
+view : Model -> Html Msg
+view model =
   div [class "wrapper", style [("display", "flex")]]
-        [ left address model
-        , right address model
+        [ left model
+        , right model
         ]
 
 
-right address model =
+right model =
   div [style [("order", "2"), ("max-width", "50%")]]
         ( [ h1 [] [text "State"]
          , div [id "state"] []
         ]
          ++ (Maybe.withDefault []
                     <| Maybe.map
-                         (\s -> [State.view (Signal.forwardTo address (StateAction s.pid)) s])
+                         (\s -> [Html.App.map (StateMsg s.pid) (State.view s)])
                          model.state)
         )
 
-left address model =
+left model =
   div [class "wrapper", style [("order", "1")]]
         [ h1 [] [text "Process List"]
         , span [] [text model.error, text <| Maybe.withDefault "" <| Maybe.map (.error) model.state]
         , input [ type' "text", value model.filter
-                , on "input" targetValue (\str -> Signal.message address (Filter str)) ] []
-        , viewProcessList address model
+                , onInput Filter ] []
+        , viewProcessList model
         ]
-
-viewProcessList address model =
+viewProcessList : Model -> Html Msg
+viewProcessList model =
   let
       filterArgs = String.split " " model.filter
-      filtered = filter (Process.filter filterArgs) model.processList
-      passon = Signal.forwardTo address Selected
+      filtered = filter (EP.filter filterArgs) model.processList
       isSelected = \p -> Just p.pid == model.selected
+      viewPL = table_ ([EP.thead]
+                           ++ (map (\p -> EP.viewTr p <| isSelected p ) filtered))
   in
-  table_ ([Process.thead]
-           ++ (map (\p -> Process.viewTr passon p <| isSelected p ) filtered))
+      Html.App.map Selected viewPL
 
 -- AJAX
 
 getProcessList =
   let
-    request = get (list Process.decode) "/json/obs.json"
-    result = (Task.map ReceiveProcessList request)
+    fetchTask = get (list EP.decode) "/json/obs.json"
+    fetchError = (\err -> (Error (toString err)))
+    fetchSuccess = ReceiveProcessList
   in
-    Effects.task (Task.onError result (\err -> Task.succeed (Error (toString err))))
+    Task.perform fetchError fetchSuccess fetchTask

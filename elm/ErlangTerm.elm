@@ -1,18 +1,18 @@
-module ErlangTerm(ETerm(..), EPrim(..), Action(Filter)
-                 , update, decode, view, encodeWithoutTags
-                 , setup) where
+module ErlangTerm exposing (ETerm(..), EPrim(..), Msg(Filter)
+                           , update, decode, view, encodeWithoutTags
+                           , setup, dm)
 
 import Html exposing (..)
 import Html.Shorthand exposing (..)
 import Html.Attributes exposing (style)
 import Html.Events exposing (onClick, on, defaultOptions, onWithOptions)
 import Task exposing (Task)
-import Effects exposing (Never)
 import Json.Decode as De exposing(..)
 import Json.Encode as En exposing(..)
 import String exposing (contains)
 import Material.Icons.Content as Material exposing (..)
 import Color exposing (..)
+import Debug exposing (..)
 
 -- MODEL
 -- Missing: Ports, Records, Proplist?
@@ -33,9 +33,9 @@ type EPrim = EInt Int
            | NYI
 
 type ETerm =  ETuple Meta (List ETerm)
-            | EList Meta (List ETerm)
-            | EMap Meta (List (ETerm, ETerm))
-            | EBasic Meta EPrim
+           | EList Meta (List ETerm)
+           | EMap Meta (List (ETerm, ETerm))
+           | EBasic Meta EPrim
 
 initbasic = EBasic dm
 
@@ -67,10 +67,10 @@ tuplemap f t =
 
 -- UPDATE
 
-type Action = Click Int
-            | Filter String
+type Msg = Click Int
+         | Filter String
 
-update : Action -> ETerm -> ETerm
+update : Msg -> ETerm -> ETerm
 update action model =
   case action of
     Click i ->
@@ -127,7 +127,7 @@ matchesFilter filter prim =
 
 -- VIEW
 
-viewEPrim : EPrim -> Html
+viewEPrim : EPrim -> Html Msg
 viewEPrim term =
   case term of
     EInt i -> text <| toString i
@@ -142,12 +142,12 @@ viewEPrim term =
     ERef r -> text r
     NYI -> text "NYI"
 
-view : Signal.Address Action -> ETerm -> Html
-view address term =
+view : ETerm -> Html Msg
+view term =
   case term of
-    ETuple m ts -> viewTuple address m ts
-    EMap m kv -> viewMap address m kv
-    EList m l -> viewList address m l
+    ETuple m ts -> viewTuple m ts
+    EMap m kv -> viewMap m kv
+    EList m l -> viewList m l
     EBasic m p -> red m <| viewEPrim p
 
 red m h =
@@ -155,11 +155,11 @@ red m h =
     span [style [( "background-color", "yellow" )]] [h]
   else
     h
-
-clickEvent address m h =
+clickEvent : Meta -> List (Html Msg) -> Html Msg
+clickEvent m h =
   let
     opt = {defaultOptions | stopPropagation = True}
-    clck = onWithOptions "click" opt De.value (\_ -> Signal.message address <| Click m.id)
+    clck = onWithOptions "click" opt (De.succeed (Click m.id))
   in
     span [clck, style [("cursor", "pointer")]] h
 
@@ -168,40 +168,40 @@ add =
 remove =
   Material.remove_circle_outline Color.lightBlue 12
 
-viewTuple address m ts =
+viewTuple m ts =
   if m.fold && not m.highlight then
-    clickEvent address m [text "{", add, text "}"]
+    clickEvent m [text "{", add, text "}"]
   else
-    div_ <| [clickEvent address m [text "{", remove]]
-          ++ (join (\x->\s-> span_ [view address x, s]) ts)
-          ++ [clickEvent address m  [text "}"]]
+    div_ <| [clickEvent m [text "{", remove]]
+          ++ (join (\x->\s-> span_ [view x, s]) ts)
+          ++ [clickEvent m [text "}"]]
 
-viewList address m ts =
+viewList m ts =
   if m.fold && not m.highlight then
-    clickEvent address m [text "[", add, text "]"]
+    clickEvent m [text "[", add, text "]"]
   else
     (ul [style [("margin-left", "20px"), ("padding-left", "15px")]] <|
-         [clickEvent address m  [text "[", remove]]
-         ++ (join (\x->\s-> li [style ilStyles] [view address x, s]) ts)
-         ++ [clickEvent address m [text "]" ]])
+         [clickEvent m [text "[", remove]]
+         ++ (join (\x->\s-> li [style ilStyles] [view x, s]) ts)
+         ++ [clickEvent m [text "]" ]])
 
-viewMap address m kv =
-  if List.isEmpty kv then viewMapEmpty else viewMapNormal address m kv
+viewMap m kv =
+  if List.isEmpty kv then viewMapEmpty else viewMapNormal m kv
 
 viewMapEmpty =
   text "#{}"
-viewMapNormal address m kv =
+viewMapNormal m kv =
   if m.fold && not m.highlight then
-    clickEvent address m [text "#{", add, text "}"]
+    clickEvent m [text "#{", add, text "}"]
   else
   div [style [("margin-left", "20px")]]
-       [ clickEvent address m  [text "#{", remove]
+       [ clickEvent m [text "#{", remove]
        , ul [style [("padding-left", "15px")]]
               <| join (\kv->\s-> li [style ilStyles]
-                       [view address (fst kv)
+                       [view (fst kv)
                        , text " => "
-                       , view address (snd kv), s]) kv
-       , clickEvent address m [text "}"] ]
+                       , view (snd kv), s]) kv
+       , clickEvent m [text "}"] ]
 
 ilStyles =
   [ ("list-style-position", "inside")
@@ -209,7 +209,7 @@ ilStyles =
   , ("padding-left", "5px")
   ]
 
-join : (a -> Html -> Html) -> List a -> List Html
+join : (a -> Html Msg -> Html Msg) -> List a -> List (Html Msg)
 join f xs =
   let
   sep = span [style []] [text ", "]
@@ -222,7 +222,7 @@ join f xs =
   in
     helper xs
 
-sepfloat : Html -> Html
+sepfloat : Html Msg -> Html Msg
 sepfloat s =
   span [style [("display", "inline")]] [s]
 
