@@ -6,7 +6,6 @@
   {applications, [
                   kernel,
                   stdlib,
-                  sync,
                   cowboy
                  ]},
   {mod, { obsvector_app, []}},

@@ -5,8 +5,6 @@
 start() ->
     ok = application:start(crypto),
     ok = application:start(ranch),
-    ok = application:start(sync),
     ok = application:start(cowlib),
     ok = application:start(cowboy),
-    ok = application:start(obsvector),
-    sync:go().
+    ok = application:start(obsvector).
