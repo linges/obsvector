@@ -12,12 +12,15 @@ import Json.Encode
 import ErlangProcess as EP
 import ErlangTerm as ET exposing (..)
 import Html.App exposing (map)
+import Time exposing (millisecond, Time)
+import Debug
 
 -- MODEL
 
 type alias Model = { pid : EP.Pid
                    , state : Maybe State
                    , filter : String
+                   , waitingSince : Maybe Time -- used for debouncing the filter
                    , error : String
                    }
 type alias State = ETerm
@@ -26,6 +29,7 @@ init pid =
   ( { pid = pid
     , state = Nothing
     , filter = ""
+    , waitingSince = Nothing
     , error = ""}
     , getProcessState pid
   )
@@ -36,6 +40,7 @@ type Msg = ReceiveProcessState State
          | Filter String
          | ETermMsg ET.Msg
          | Error String
+         | Tick Time
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update action model =
@@ -46,11 +51,20 @@ update action model =
       )
 
     Filter f ->
-      let t' = Maybe.map (ET.update <| ET.Filter f) model.state
-      in
-        ( {model | state = t', filter = f}
-      , Cmd.none
-      )
+        ( {model | filter = f, waitingSince = Nothing}
+        , Cmd.none
+        )
+
+    Tick time -> -- remember that the sample rate might be low, currenlty 300ms
+      case model.waitingSince of
+           Nothing -> ({model| waitingSince = Just time}, Cmd.none)
+           Just t ->
+               if ((time - t) > 300 * millisecond) && (model.filter /= "")
+               then
+                   let s' = Maybe.map (ET.update <| ET.Filter model.filter) model.state
+                   in
+                   ({model| state = s'}, Cmd.none)
+               else (model, Cmd.none)
 
     ETermMsg a ->
       let t' = Maybe.map (ET.update a) model.state

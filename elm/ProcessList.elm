@@ -1,4 +1,4 @@
-module ProcessList exposing (init, update, view, Model, getProcessList)
+module ProcessList exposing (init, update, view, Model, getProcessList, Msg(..))
 
 import Html exposing (..)
 import Html.Shorthand exposing (..)
@@ -9,10 +9,11 @@ import List exposing (map, filter)
 import Json.Decode exposing (list, string, succeed)
 import Task exposing (Task)
 import Http exposing (get)
-import ProcessState as State
+import ProcessState as State exposing (Msg)
 import String
 import Html.App
 import Debug
+import Time exposing (second, Time)
 
 -- MODEL
 
@@ -43,11 +44,12 @@ type Msg = Refetch
          | Error String
          | Selected EP.Pid
          | StateMsg EP.Pid State.Msg
+         | Tick Time
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update action model =
 
-  case (Debug.log "ac" action) of
+  case action of
     Refetch ->
       (model, getProcessList)
 
@@ -73,6 +75,16 @@ update action model =
                , state = Just state}
       , Cmd.map (StateMsg p) eff
       )
+
+    Tick t -> -- just pass on tick
+      case model.state of
+        Nothing -> (model, Cmd.none)
+        Just state ->
+            let (state, eff) = (State.update (State.Tick t)) state
+            in
+              ( {model | state = Just state}
+              , Cmd.map (StateMsg state.pid) eff
+              )
 
     StateMsg pid action ->
       case model.state of
